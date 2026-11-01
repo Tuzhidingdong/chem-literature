@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+
+# Sensitive Cookies & Credentials
+cookies/*.json
+!cookies/account_template.json
+.env
+
+# Runtime downloaded papers & assets
+papers_pdf/
+papers_si/
+*.pdf
+*.docx
+*.zip
+*.rar
+*.xlsx
+
+# Temporary browser profiles & session data
+.edge_profile_*
+downloads/
+*.log
+
+# IDE & Editor configs
+.vscode/
+.idea/
+.DS_Store
