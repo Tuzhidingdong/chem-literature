@@ -1,12 +1,12 @@
 """
 core/vpn_session.py
 ===================
-基于 Chrome DevTools Protocol (CDP) 的无头/后台隔离浏览器会话管理模块。
-严格特性：
-1. 零视觉干扰：启动参数强制配置 --window-position=-32000,-32000；
-2. 隔离沙箱：每个工作账号使用完全独立的临时 Profile 与专属 Debugging Port；
-3. 支持动态加载任意多个账号 JSON Cookie 文件并自动注入会话；
-4. 内置风控拦截检测、断点网络自愈与重连。
+CDP (Chrome DevTools Protocol) isolated browser session manager.
+Key specifications:
+1. Zero visual disturbance: Forces `--window-position=-32000,-32000`;
+2. Isolated sandboxing: Each account uses an independent temp profile & debug port;
+3. Dynamic multi-account support: Automatically loads and injects session cookies;
+4. Anti-bot challenge detection and connection auto-recovery.
 """
 
 import os
@@ -35,8 +35,8 @@ RESOURCE_MAP = {
 
 BLOCK_MARKERS = [
     "just a moment", "verify you are human", "captcha", "checking your browser",
-    "non human", "unusual traffic", "访问受限", "访问过于频繁", "异常访问",
-    "cf-chl", "access denied", "too many requests"
+    "non human", "unusual traffic", "access denied", "too many requests",
+    "cf-chl", "restricted access", "automated requests"
 ]
 
 class CDPClient:
@@ -172,9 +172,9 @@ class VpnBrowserSession:
         visit_url = f"{portal_url}/user/resource/visit?id={rid}"
         href, title, _ = self.navigate(visit_url, wait_secs=8)
         
-        # 提取动态代理前缀
+        # Extract dynamic proxy routing prefix
+        # URL structure is typically https://libywn.ucas.ac.cn/https/<token>/
         parts = href.split("/")
-        # URL 形式通常为 https://libywn.ucas.ac.cn/https/<token>/
         if len(parts) >= 5 and "libywn.ucas.ac.cn" in href:
             base = f"https://libywn.ucas.ac.cn/{parts[3]}/{parts[4]}/"
         else:
