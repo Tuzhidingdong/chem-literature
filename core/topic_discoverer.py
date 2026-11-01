@@ -1,8 +1,9 @@
 """
 core/topic_discoverer.py
 ========================
-自动根据用户自然语言主题与年限，调用开放学术 API (OpenAlex, Crossref) 构建候选文献库，
-并执行研究型论文（Original Research）自动筛除会议摘要（Meeting Abstracts）、预印本与综述的初筛。
+Discovers literature candidates via open scholarly APIs (OpenAlex, Crossref)
+based on natural language topic prompts and publication year filters.
+Automatically screens and flags reviews, meeting abstracts, and retractions.
 """
 
 import os
@@ -23,11 +24,11 @@ class TopicDiscoverer:
         self.headers = {"User-Agent": "ChemLiteratureWorkflow/2.0 (mailto:academic-research@workflow.org)"}
 
     def fetch_candidates(self) -> pd.DataFrame:
-        """从 OpenAlex 按照关键词和年份检索文献"""
+        """Query OpenAlex works API filtered by keywords and publication years."""
         print(f"[*] Starting OpenAlex discovery for topic: '{self.topic}' (Years: {self.year_start}-{self.year_end})")
         results = []
         
-        # 构建检索查询
+        # Build search query string
         query_str = " ".join(self.keywords) if self.keywords else self.topic
         base_url = "https://api.openalex.org/works"
         
@@ -58,13 +59,13 @@ class TopicDiscoverer:
                         continue
                     
                     title = w.get("title") or ""
-                    # 快速筛除会议摘要与撤稿
+                    # Screen out meeting abstracts, author indices, and retractions
                     if "retracted" in title.lower() or "author index" in title.lower() or "meeting abstract" in title.lower():
                         continue
                     if "mtgabs" in doi.lower() or "/ma20" in doi.lower():
                         continue
                     
-                    # 识别是否为综述
+                    # Detect review articles
                     is_review = False
                     if w.get("type") == "review" or re.search(r"\b(review|progress|advances|perspective|perspectives|outlook)\b", title, re.I):
                         is_review = True
@@ -105,7 +106,7 @@ class TopicDiscoverer:
         return df
 
     def _reconstruct_abstract(self, inverted_index: Dict[str, List[int]]) -> str:
-        """从 OpenAlex inverted index 还原摘要文本"""
+        """Reconstruct plain abstract text from OpenAlex inverted index."""
         if not inverted_index:
             return ""
         try:
