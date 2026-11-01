@@ -1,0 +1,53 @@
+# Configuration for Chemical & Materials Literature Crawler Workflow
+
+workflow:
+  # The thematic query in natural language
+  topic: "Aqueous Zinc-Ion Battery Anode Interface"
+  # Core semantic search keywords for OpenAlex / Crossref
+  keywords:
+    - "zinc anode"
+    - "aqueous electrolyte"
+    - "interface engineering"
+    - "dendrite-free"
+  
+  # Year range filter (inclusive)
+  year_start: 2021
+  year_end: 2026
+  
+  # Filter out review articles, perspectives, and meeting abstracts
+  filter_research_only: true
+  
+  # Max candidate papers to search and screen
+  max_candidates: 3000
+
+# WebVPN & Multi-Account Settings
+webvpn:
+  portal_url: "https://libywn.ucas.ac.cn"
+  # Path to directory containing cookie files (e.g. account01.json, account02.json, ...)
+  # The runner will automatically detect all .json files in this folder and create parallel workers!
+  cookies_dir: "cookies"
+  
+  # Rate limiting & Anti-blocking settings
+  safety:
+    min_delay_seconds: 16.0
+    max_delay_seconds: 28.0
+    # Enable publisher interleaving to avoid slamming the same publisher endpoint
+    interleave_publishers: true
+    # Consecutive failures before circuit-break cooldown
+    max_consecutive_fails: 3
+    cooldown_seconds: 60.0
+
+# Supported Publishers Routing
+publishers:
+  elsevier:
+    resource_id: 100
+    method: "headless_render_print" # Full-text HTML DOM -> Lazy images scroll -> PrintToPDF
+  wiley:
+    resource_id: 119
+    method: "direct_pdf_download"   # /doi/pdfdirect/{doi}?download=true
+  iop_ecs:
+    resource_id: 106
+    method: "iop_endpoint_download" # /article/{doi}/pdf
+  springer:
+    resource_id: 64
+    method: "springer_link_download"
