@@ -1,12 +1,12 @@
 """
 run_workflow.py
-===============
-主控运行脚本。只需用自然语言指定主题参数或传入配置文件，
-即可一键串联：
-  1. 主题检索与智能初筛；
-  2. 自动发现 cookies/ 目录下所有账号凭据，动态启动对应数量的隔离沙箱多线程采集；
-  3. 跨出版社交错调度、礼貌间隔频控与熔断；
-  4. 自动生成配齐的研究型文献基础库 (research_corpus_paired.csv) 与详细清单。
+================
+Main workflow orchestrator. Specify a research topic and year range via CLI
+or config file to execute an end-to-end pipeline:
+  1. Literature discovery and candidate screening via open APIs;
+  2. Dynamic multi-account session detection from cookies/ directory;
+  3. Parallel headless harvesting with rate-limiting and circuit breakers;
+  4. Automatic generation of a paired research baseline corpus (research_corpus_paired.csv).
 """
 
 import os
@@ -20,7 +20,6 @@ import argparse
 import pandas as pd
 from typing import List, Dict
 
-# 添加模块路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.topic_discoverer import TopicDiscoverer
 from core.vpn_session import VpnBrowserSession
@@ -49,11 +48,11 @@ def main():
     max_cand = wf_cfg.get("max_candidates", 3000)
 
     print("=============================================================")
-    print(f"🚀 Launching Chemical Literature Workflow for Topic: {topic}")
-    print(f"📅 Target Year Range: {year_start} - {year_end}")
+    print(f"[*] Launching Chemical Literature Workflow for Topic: {topic}")
+    print(f"[*] Target Year Range: {year_start} - {year_end}")
     print("=============================================================")
 
-    # 阶段 1：确定主题与检索候选文献
+    # Stage 1: Candidate discovery and metadata retrieval
     cand_csv = "literature_candidates.csv"
     if not os.path.exists(cand_csv):
         discoverer = TopicDiscoverer(topic, keywords, year_start, year_end, max_candidates=max_cand)
@@ -63,7 +62,7 @@ def main():
         print(f"[*] Found existing {cand_csv}, loading records...")
         df_candidates = pd.read_csv(cand_csv, dtype=str).fillna("")
 
-    # 阶段 2：检测 cookies 目录中的可用多账号凭据
+    # Stage 2: Detect active account credentials in cookies directory
     cookies_dir = cfg.get("webvpn", {}).get("cookies_dir", "cookies")
     cookie_files = sorted(glob.glob(os.path.join(cookies_dir, "*.json")))
     if not cookie_files:
@@ -72,17 +71,16 @@ def main():
 
     print(f"[+] Detected {len(cookie_files)} active WebVPN accounts: {[os.path.basename(f) for f in cookie_files]}")
 
-    # 阶段 3：构建任务队列并交错调度
+    # Stage 3: Task queue partitioning and parallel worker dispatch
     harvester = PaperHarvester(output_dir=".")
     
-    # 筛选未下载正文的目标
     pending = df_candidates[df_candidates["local_pdf_path"].str.strip() == ""].copy()
     print(f"[*] Total pending papers to harvest: {len(pending)}")
 
     if not cookie_files or len(pending) == 0:
         print("[*] No active accounts or no pending downloads. Proceeding to partition...")
     else:
-        # 预解析 Elsevier PII
+        # Pre-resolve ScienceDirect PIIs
         els_dois = pending[pending["doi"].str.lower().str.startswith("10.1016/")]["doi"].tolist()
         print(f"[*] Pre-resolving PII for {len(els_dois)} Elsevier papers...")
         pii_map = {}
@@ -91,7 +89,7 @@ def main():
             if pii:
                 pii_map[d] = pii
 
-        # 将任务队列平分给检测到的所有账号，动态支持 1~N 个账号并行
+        # Partition targets across available workers
         num_workers = len(cookie_files)
         targets = pending["doi"].tolist()
         worker_queues = [targets[i::num_workers] for i in range(num_workers)]
@@ -110,7 +108,7 @@ def main():
                         sd_base = vpn.get_proxy_base("elsevier")
                         wiley_base = vpn.get_proxy_base("wiley")
                         iop_base = vpn.get_proxy_base("iop")
-                        print(f"[{tag}] Bases connected: Elsevier, Wiley, IOP.")
+                        print(f"[{tag}] Connected to endpoints: Elsevier, Wiley, IOP.")
 
                         consec_fail = 0
                         while queue:
@@ -152,20 +150,19 @@ def main():
                     print(f"[{tag} RETRY] Session error: {e}")
                     time.sleep(20)
 
-        # 启动多线程
         threads = []
         base_port = 9550
         for i, c_file in enumerate(cookie_files):
             t = threading.Thread(target=worker_thread, args=(i, c_file, base_port + i, worker_queues[i]))
             threads.append(t)
             t.start()
-            time.sleep(4) # 错峰启动浏览器
+            time.sleep(4)
 
         for t in threads:
             t.join()
 
-    # 阶段 4：自动分离“正文与 SI 双配齐的研究型论文”基础库
-    print("\n[*] Partitioning Paired Research Base Corpus...")
+    # Stage 4: Partition paired research corpus (both full text and SI verified)
+    print("\n[*] Partitioning Paired Research Baseline Corpus...")
     def check_file(p):
         return str(p).startswith("papers_") and os.path.exists(p)
 
@@ -180,11 +177,11 @@ def main():
     paired_research.to_csv(out_paired_csv, index=False, encoding="utf-8-sig")
     
     print("=============================================================")
-    print(f"🎉 Workflow Successfully Completed!")
-    print(f"📊 Total Candidates: {len(df_candidates)}")
-    print(f"📑 Physical Full-Text PDFs: {df_candidates['has_pdf'].sum()}")
-    print(f"📦 Physical SI Attachments: {df_candidates['has_si'].sum()}")
-    print(f"💎 High-Quality Dual-Paired Research Corpus: {len(paired_research)} -> Saved to {out_paired_csv}")
+    print("[*] Workflow execution completed.")
+    print(f"[*] Total candidate records: {len(df_candidates)}")
+    print(f"[*] Physical full-text PDFs: {df_candidates['has_pdf'].sum()}")
+    print(f"[*] Physical SI attachments: {df_candidates['has_si'].sum()}")
+    print(f"[*] Dual-paired research articles: {len(paired_research)} -> {out_paired_csv}")
     print("=============================================================")
 
 if __name__ == "__main__":
