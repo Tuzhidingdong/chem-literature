@@ -55,7 +55,7 @@ chem-literature/
 
 ### 1. Install Dependencies
 
-Python 3.9+ is recommended:
+Python 3.10+ is required:
 
 ```bash
 pip install -r requirements.txt
@@ -97,9 +97,34 @@ Upon completion, the following artifacts are generated in the working directory:
 - `literature_candidates.csv`: Complete metadata table of candidate publications.
 - `papers_pdf/`: Downloaded full-text PDFs.
 - `papers_si/`: Downloaded supporting information files (PDF, DOCX, ZIP, XLSX).
-- `research_corpus_paired.csv`: The curated baseline dataset containing only research articles where **both** the full-text PDF and SI are verified on disk.
+- `research_corpus_paired.csv`: The curated baseline dataset containing only research articles where **both** the full-text PDF and SI are verified on disk, enriched with preprocessing paths and QC statuses.
+- `runs/preprocessed/<paper_id>/01_preprocessing/`: Deterministic source packages containing cleaned MAIN/SI text, table CSV/Markdown, extracted figure/table assets, `evidence_index.json`, and `PREPROCESSING_QC_REPORT.md`.
 
 ---
+
+## 5. Deterministic Source Preprocessing (automatic downstream stage)
+
+After Stage 4 has verified the physical MAIN PDF + SI pair and filtered the paired original-research corpus, Stage 5 preprocesses each paired record locally. It reuses the deterministic preprocessing implementation extracted from [Chem-Literacy](https://github.com/Tuzhidingdong/chem-literacy): PyMuPDF text/layout extraction, table extraction, MAIN figure/table crops, SI PDF embedded-image/page-composite extraction, and SI DOCX text/table/OOXML-media extraction.
+
+The preprocessing stage:
+- Makes no LLM/API model calls and performs no OCR.
+- Uses PyMuPDF fallback by default. Optional GROBID structural coordinates can be enabled in configuration.
+- Safely extracts only PDF/DOCX members from SI ZIP archives; the original archive is preserved in the preprocessing package. Other members are recorded as unparsed rather than silently treated as extracted text.
+- Writes one package per paper to `runs/preprocessed/<paper_id>/01_preprocessing/`.
+- Adds `preprocessing_path`, `preprocessing_status`, `preprocessing_action`, `preprocessing_error`, `preprocessing_qc_report`, and `preprocessing_grobid_status` to both corpus CSVs.
+- Continues to the next paper if one paper fails. A matching input signature and existing evidence index allow unchanged packages to be reused.
+
+Useful controls:
+
+```bash
+# Skip preprocessing for a harvesting-only run
+python run_workflow.py --skip-preprocessing
+
+# Override the package output location
+python run_workflow.py --preprocessed-dir "E:/Research/preprocessed"
+```
+
+Supported status values include `COMPLETE`, `WARNING_SCANNED_PAGES`, `PARTIAL_NO_SI`, `PARTIAL_SI_UNSUPPORTED`, and `FAILED`. A scanned-page warning means OCR has not been performed.
 
 ## Configuration (`config/settings.yaml`)
 
