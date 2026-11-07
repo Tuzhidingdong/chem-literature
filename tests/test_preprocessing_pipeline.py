@@ -44,6 +44,7 @@ def test_zip_si_members_are_preprocessed_and_original_archive_preserved():
         assert result.iloc[0]["preprocessing_status"] == "PARTIAL_SI_UNSUPPORTED"
         assert "Supporting Information Figure S1" in (package_dir / "si_analysis.md").read_text(encoding="utf-8")
         assert (package_dir / "source_archives" / "support.zip").is_file()
+        assert (package_dir / "source_si_unpacked" / "0001_support.pdf").is_file()
         manifest = json.loads((package_dir / "evidence_index.json").read_text(encoding="utf-8"))
         assert manifest["metadata"]["has_si"] is True
         assert manifest["inventory"]["source_archives"]
