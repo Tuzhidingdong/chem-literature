@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.topic_discoverer import TopicDiscoverer
 from core.vpn_session import VpnBrowserSession
 from core.paper_harvester import PaperHarvester
+from core.preprocessing.pipeline import preprocess_paired_corpus
 
 def load_config(config_path: str = "config/settings.yaml") -> dict:
     if os.path.exists(config_path):
@@ -37,6 +38,8 @@ def main():
     parser.add_argument("--year_start", type=int, help="Start year", default=None)
     parser.add_argument("--year_end", type=int, help="End year", default=None)
     parser.add_argument("--config", type=str, help="Path to settings.yaml", default="config/settings.yaml")
+    parser.add_argument("--skip-preprocessing", action="store_true", help="Skip the deterministic paired-PDF/SI preprocessing stage.")
+    parser.add_argument("--preprocessed-dir", type=str, default=None, help="Override the preprocessing output directory.")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -175,7 +178,53 @@ def main():
     paired_research = df_candidates[(~is_rev) & df_candidates["has_pdf"] & df_candidates["has_si"]].copy()
     out_paired_csv = "research_corpus_paired.csv"
     paired_research.to_csv(out_paired_csv, index=False, encoding="utf-8-sig")
-    
+
+    # Stage 5: Deterministic preprocessing of each physically verified MAIN+SI pair.
+    preprocessing_cfg = cfg.get("preprocessing", {})
+    preprocessing_enabled = bool(preprocessing_cfg.get("enabled", True)) and not args.skip_preprocessing
+    preprocessing_output = args.preprocessed_dir or preprocessing_cfg.get("output_dir", "runs/preprocessed")
+    if preprocessing_enabled and not paired_research.empty:
+        print("\n[*] Preprocessing paired research papers (zero LLM/API tokens)...")
+
+        def persist_preprocessing_progress(result: dict):
+            doi_value = str(result.get("doi", "")).strip().lower()
+            if doi_value and "doi" in df_candidates.columns:
+                mask = df_candidates["doi"].astype(str).str.strip().str.lower() == doi_value
+                for key, value in result.items():
+                    if key == "doi":
+                        continue
+                    if key not in df_candidates.columns:
+                        df_candidates[key] = ""
+                    df_candidates.loc[mask, key] = value
+                df_candidates.to_csv(cand_csv, index=False, encoding="utf-8-sig")
+
+        paired_research = preprocess_paired_corpus(
+            paired_research,
+            working_dir=".",
+            preprocessed_dir=preprocessing_output,
+            grobid_enabled=bool(preprocessing_cfg.get("grobid_enabled", False)),
+            grobid_url=preprocessing_cfg.get("grobid_url"),
+            grobid_timeout_seconds=int(preprocessing_cfg.get("grobid_timeout_seconds", 30)),
+            max_zip_member_bytes=int(preprocessing_cfg.get("max_zip_member_bytes", 104857600)),
+            max_zip_total_bytes=int(preprocessing_cfg.get("max_zip_total_bytes", 536870912)),
+            progress_callback=persist_preprocessing_progress,
+        )
+        for column in paired_research.columns:
+            if column not in df_candidates.columns:
+                df_candidates[column] = ""
+            df_candidates.loc[paired_research.index, column] = paired_research[column]
+        counts = paired_research["preprocessing_status"].value_counts().to_dict()
+        print(f"[+] Preprocessing status counts: {counts}")
+        print(f"[+] Preprocessing packages: {preprocessing_output}/<paper_id>/01_preprocessing/")
+    elif args.skip_preprocessing or not preprocessing_enabled:
+        print("[*] Preprocessing stage skipped by CLI/configuration.")
+    else:
+        print("[*] No paired research papers are available for preprocessing.")
+
+    # Persist the paired corpus with preprocessing paths/status fields for downstream skills.
+    paired_research.to_csv(out_paired_csv, index=False, encoding="utf-8-sig")
+    df_candidates.to_csv(cand_csv, index=False, encoding="utf-8-sig")
+
     print("=============================================================")
     print("[*] Workflow execution completed.")
     print(f"[*] Total candidate records: {len(df_candidates)}")
