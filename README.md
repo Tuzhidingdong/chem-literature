@@ -1,7 +1,7 @@
 # Chem-Literature: Automated Scientific Literature Discovery and Full-Text/SI Paired Harvesting Workflow
 
 > **An engineering-grade literature mining pipeline tailored for chemistry and materials science.**  
-> Seamlessly orchestrates: Natural Language Topic Formulation $\to$ Scholarly Candidate Screening (with automatic review/abstract filtering) $\to$ Multi-Account WebVPN Parallel Ingestion $\to$ Physical File Integrity Verification $\to$ Dual-Paired Research Corpus Construction.
+Seamlessly orchestrates: Natural Language Topic Formulation → Scholarly Candidate Screening → Multi-Account WebVPN Parallel Ingestion → Physical File Integrity Verification → Dual-Paired Research Corpus Construction → Deterministic MAIN/SI Preprocessing.
 
 ---
 
