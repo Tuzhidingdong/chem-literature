@@ -43,7 +43,13 @@ chem-literature/
 ├── core/
 │   ├── topic_discoverer.py      # Candidate query and metadata parser via OpenAlex API
 │   ├── vpn_session.py           # Multi-account isolated CDP browser session manager
-│   └── paper_harvester.py       # Publisher-specific harvesting algorithms
+│   ├── paper_harvester.py       # Publisher-specific harvesting algorithms
+│   └── preprocessing/
+│       ├── pipeline.py           # Paired-corpus integration and SI ZIP adapter
+│       └── source_preprocessor.py # Extracted deterministic Chem-Literacy engine
+├── schemas/
+│   └── source_package.schema.json
+├── tests/                        # Preprocessing regression/integration tests
 ├── run_workflow.py              # Central workflow execution CLI
 ├── requirements.txt             # Python dependencies
 └── README.md                    # Project documentation
@@ -147,6 +153,15 @@ webvpn:
     max_delay_seconds: 28.0
     max_consecutive_fails: 3
     cooldown_seconds: 60.0
+
+preprocessing:
+  enabled: true
+  output_dir: "runs/preprocessed"
+  grobid_enabled: false
+  grobid_url: "http://localhost:8070"
+  grobid_timeout_seconds: 30
+  max_zip_member_bytes: 104857600
+  max_zip_total_bytes: 536870912
 ```
 
 ---
