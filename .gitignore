@@ -30,3 +30,9 @@ downloads/
 .vscode/
 .idea/
 .DS_Store
+
+# Generated corpus and preprocessing outputs
+literature_candidates.csv
+research_corpus_paired.csv
+research_corpus_paired_manifest.json
+runs/preprocessed/
