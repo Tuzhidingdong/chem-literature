@@ -71,7 +71,11 @@ def _extract_supported_zip_members(
                     f"[archive member limit exceeded: {len(infos)} members, limit {max_members}]"
                 )
                 infos = infos[:max_members]
-            total_declared = sum(max(0, info.file_size) for info in infos)
+            supported_infos = [
+                info for info in infos
+                if Path(PurePosixPath(info.filename.replace("\\", "/")).name).suffix.lower() in SUPPORTED_DOCUMENTS
+            ]
+            total_declared = sum(max(0, info.file_size) for info in supported_infos)
             total_budget_exceeded = total_declared > max_total_bytes
             total_written = 0
             for index, info in enumerate(infos, start=1):
@@ -98,9 +102,23 @@ def _extract_supported_zip_members(
                 try:
                     with archive.open(info, "r") as src, target.open("wb") as dst:
                         shutil.copyfileobj(src, dst, length=1024 * 1024)
-                except (OSError, RuntimeError, zipfile.BadZipFile) as exc:
+                except Exception as exc:
                     target.unlink(missing_ok=True)
                     unsupported.append(f"{info.filename} [extraction failed: {exc}]")
+                    continue
+                valid_document = True
+                try:
+                    if suffix == ".pdf":
+                        with target.open("rb") as handle:
+                            valid_document = handle.read(5) == b"%PDF-"
+                    elif suffix == ".docx":
+                        with zipfile.ZipFile(target) as document:
+                            valid_document = "word/document.xml" in document.namelist()
+                except Exception:
+                    valid_document = False
+                if not valid_document:
+                    target.unlink(missing_ok=True)
+                    unsupported.append(f"{info.filename} [file extension/content mismatch]")
                     continue
                 actual_size = target.stat().st_size
                 if actual_size > max_member_bytes or total_written + actual_size > max_total_bytes:
@@ -246,6 +264,8 @@ def preprocess_paired_corpus(
                 "grobid_enabled": bool(grobid_enabled),
                 "grobid_url": grobid_url or "",
                 "grobid_timeout_seconds": int(grobid_timeout_seconds),
+                "max_zip_member_bytes": int(max_zip_member_bytes),
+                "max_zip_total_bytes": int(max_zip_total_bytes),
             }
             signature = hashlib.sha256(
                 json.dumps(signature_payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
@@ -253,7 +273,12 @@ def preprocess_paired_corpus(
             input_manifest = package_dir / "PREPROCESSING_INPUTS.json"
             previous = _read_json(input_manifest)
             existing_package = _read_json(package_dir / "evidence_index.json")
-            if previous and previous.get("signature") == signature and existing_package:
+            if (
+                previous
+                and previous.get("signature") == signature
+                and existing_package
+                and (package_dir / "PREPROCESSING_QC_REPORT.md").is_file()
+            ):
                 package = existing_package
                 record["preprocessing_action"] = "REUSED_UNCHANGED"
             else:
@@ -325,9 +350,10 @@ def preprocess_paired_corpus(
             record["preprocessing_grobid_status"] = package["processing_summary"].get("grobid_status", "")
             record["preprocessing_action"] = record["preprocessing_action"] or "PROCESSED"
         except Exception as exc:
+            package_display = str(package_dir.relative_to(root)) if package_dir.is_relative_to(root) else str(package_dir)
             record = {
                 "doi": doi,
-                "preprocessing_path": str(package_dir),
+                "preprocessing_path": package_display,
                 "preprocessing_status": "FAILED",
                 "preprocessing_action": "FAILED",
                 "preprocessing_error": f"{type(exc).__name__}: {exc}",
