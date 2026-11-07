@@ -12,7 +12,10 @@ from core.preprocessing.pipeline import preprocess_paired_corpus
 def _make_pdf(path: Path, text: str):
     document = pymupdf.open()
     page = document.new_page()
-    page.insert_text((50, 60), text)
+    page.insert_text(
+        (50, 60),
+        text + " This generated test page contains a sufficiently long searchable text passage for deterministic preprocessing checks."
+    )
     document.save(path)
     document.close()
 
