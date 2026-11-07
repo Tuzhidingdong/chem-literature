@@ -231,7 +231,6 @@ def preprocess_paired_corpus(
         main_value = str(row.get("local_pdf_path", "") or "").strip()
         si_value = str(row.get("local_si_info", "") or "").strip()
         package_dir = preprocess_root / paper_id / "01_preprocessing"
-        paper_root = package_dir.parent
 
         try:
             package_display = str(package_dir.relative_to(root)) if package_dir.is_relative_to(root) else str(package_dir)
@@ -284,10 +283,8 @@ def preprocess_paired_corpus(
             else:
                 if package_dir.exists():
                     shutil.rmtree(package_dir)
-                unpack_root = paper_root / "_unpacked_si"
-                if unpack_root.exists():
-                    shutil.rmtree(unpack_root)
                 package_dir.mkdir(parents=True, exist_ok=True)
+                unpack_root = package_dir / "source_si_unpacked"
                 unpack_root.mkdir(parents=True, exist_ok=True)
 
                 supplementary_inputs: List[Path] = []
