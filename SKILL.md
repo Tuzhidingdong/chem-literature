@@ -71,6 +71,8 @@ Upon execution completion, verify the physical presence of the generated artifac
 3. `papers_si/`: Physical supporting information files.
 4. `research_corpus_paired.csv`: Filtered dataset containing **only** original research articles where both PDF and SI are present on disk.
 
+The `research_corpus_paired.csv` is the authoritative final output for downstream literature-analysis workflows. Its `local_pdf_path` and `local_si_info` fields point to the downloaded main PDF and SI file. The current workflow writes these paths relative to the working directory from which `run_workflow.py` was executed. The current implementation does not emit a separate `research_corpus_paired_manifest.json`.
+
 ### Step 5: Report to User
 Summarize the results cleanly:
 - Total candidate papers screened.
