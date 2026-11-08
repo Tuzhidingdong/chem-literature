@@ -24,7 +24,7 @@
 3. **Dual-Paired Research Baseline Corpus**
    - Automatically identifies and filters out review articles, perspectives, editorials, and meeting abstracts during the discovery phase.
    - Verifies physical on-disk presence and file sizes for both the main PDF and the Supporting Information (SI).
-   - Generates a certified `research_corpus_paired.csv` baseline dataset and statistical manifest (`research_corpus_paired_manifest.json`) for downstream structural extraction and knowledge graph modeling.
+   - Generates the curated `research_corpus_paired.csv` baseline dataset for downstream structural extraction and knowledge graph modeling. The current workflow does not generate a separate `research_corpus_paired_manifest.json`; downstream tools should derive their internal source manifests from the CSV and its referenced files.
 
 4. **Zero User Desktop Disturbance**
    - Enforces headless browser launch with `--window-position=-32000,-32000` off-screen coordinates, ensuring zero window popups or mouse/keyboard focus disruption.
@@ -97,7 +97,7 @@ Upon completion, the following artifacts are generated in the working directory:
 - `literature_candidates.csv`: Complete metadata table of candidate publications.
 - `papers_pdf/`: Downloaded full-text PDFs.
 - `papers_si/`: Downloaded supporting information files (PDF, DOCX, ZIP, XLSX).
-- `research_corpus_paired.csv`: The curated baseline dataset containing only research articles where **both** the full-text PDF and SI are verified on disk.
+- `research_corpus_paired.csv`: The authoritative curated baseline dataset containing original-research articles where **both** the full-text PDF and SI are verified on disk. Its `local_pdf_path` and `local_si_info` columns point to the local files. The paths are relative to the directory from which `run_workflow.py` was executed (unless a downstream tool receives another explicit base directory).
 
 ---
 
